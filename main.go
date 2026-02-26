@@ -39,5 +39,6 @@ func main() {
 	}
 
 	bot.StartBot(runCtx)
-}
 
+	runCtx.DB.Close()
+}
