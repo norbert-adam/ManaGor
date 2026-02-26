@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Golem • Home</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Space+Grotesk:wght@500;600&display=swap');
+        
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+        }
+        
+        .logo-font {
+            font-family: 'Space Grotesk', sans-serif;
+        }
+
+        .nav-link {
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .nav-link:hover {
+            color: #22d3ee !important;
+            transform: translateY(-1px);
+        }
+        
+        .active {
+            color: #22d3ee;
+            border-bottom: 3px solid #22d3ee;
+        }
+    </style>
+</head>
+<body class="bg-zinc-950 text-zinc-200 min-h-screen">
+    <!-- Navigation Bar -->
+    <nav class="bg-zinc-900 border-b border-zinc-800 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-6 py-5 flex items-center justify-between">
+            <!-- Logo -->
+            <div class="flex items-center gap-x-3">
+                <div class="w-9 h-9 bg-cyan-500 rounded-2xl flex items-center justify-center text-white font-bold text-2xl shadow-lg shadow-cyan-500/50">
+                    G
+                </div>
+                <div>
+                    <span class="logo-font text-3xl font-semibold tracking-tighter text-white">golem</span>
+                </div>
+            </div>
+
+            <!-- Menu Items -->
+            <div class="flex items-center gap-x-8 text-sm font-medium">
+                <a href="#" class="nav-link active px-4 py-2">Home</a>
+                <a href="#" class="nav-link text-zinc-400 hover:text-zinc-200 px-4 py-2">Calendar</a>
+                <a href="#" class="nav-link text-zinc-400 hover:text-zinc-200 px-4 py-2">Todos</a>
+                <a href="#" class="nav-link text-zinc-400 hover:text-zinc-200 px-4 py-2">Warranty</a>
+            </div>
+
+            <!-- Right side -->
+            <div class="flex items-center gap-x-4">
+                <div class="bg-zinc-800 text-xs px-3 py-1.5 rounded-2xl flex items-center gap-x-2 border border-zinc-700">
+                    <div class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+                    <span class="text-emerald-400 font-mono">home-server online</span>
+                </div>
+                <button onclick="alert('Telegram bot connected! ✅\nYou can now access Golem securely from anywhere.')"
+                        class="bg-white text-zinc-900 hover:bg-zinc-100 px-5 py-2 rounded-2xl text-sm font-semibold flex items-center gap-x-2 transition">
+                    <i class="fa-brands fa-telegram"></i>
+                    <span>Telegram</span>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="max-w-7xl mx-auto px-6 py-16">
+        <div class="grid lg:grid-cols-2 gap-16 items-center">
+            <!-- Left: Text -->
+            <div class="space-y-8">
+                <div class="inline-flex items-center gap-x-2 bg-zinc-900 border border-zinc-800 rounded-3xl px-5 py-2 text-sm">
+                    <span class="text-emerald-400">●</span>
+                    <span class="font-medium">Running on your home server</span>
+                </div>
+                
+                <h1 class="text-6xl lg:text-7xl font-semibold tracking-tighter leading-none logo-font">
+                    Your life,<br>
+                    <span class="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-violet-400">under one roof.</span>
+                </h1>
+                
+                <p class="text-xl text-zinc-400 max-w-md">
+                    Private. Secure. Yours.<br>
+                    To-dos, calendar, warranties, notes — all in one beautiful app that lives on your hardware.
+                </p>
+                
+                <div class="flex items-center gap-x-4 pt-4">
+                    <button onclick="alert('This would open your dashboard in the real app! 🚀')"
+                            class="bg-white text-zinc-900 px-8 py-4 rounded-3xl font-semibold text-lg flex items-center gap-x-3 hover:scale-105 transition">
+                        Open Dashboard
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </button>
+                    
+                    <button onclick="alert('Telegram bot is ready! Send /start to @yourbot')"
+                            class="border border-zinc-700 hover:border-zinc-500 px-8 py-4 rounded-3xl font-semibold text-lg flex items-center gap-x-3 transition">
+                        <i class="fa-brands fa-telegram text-cyan-400"></i>
+                        Open in Telegram
+                    </button>
+                </div>
+                
+                <div class="pt-8 text-xs text-zinc-500 flex items-center gap-x-8">
+                    <div>✅ End-to-end encrypted</div>
+                    <div>✅ Zero cloud dependency</div>
+                    <div>✅ Written in Go</div>
+                </div>
+            </div>
+
+            <!-- Right: Picture + nice frame -->
+            <div class="relative">
+                <div class="absolute -inset-4 bg-gradient-to-br from-cyan-500/20 to-violet-500/20 rounded-[3rem] -rotate-3"></div>
+                <div class="relative bg-zinc-900 p-3 rounded-3xl border border-zinc-800 shadow-2xl">
+                    <img src="https://picsum.photos/id/1015/800/620" 
+                         alt="Cozy home workspace with digital life tools"
+                         class="w-full rounded-2xl">
+                    <div class="absolute bottom-8 left-8 bg-black/70 backdrop-blur-md px-5 py-3 rounded-2xl text-sm">
+                        <div class="flex items-center gap-x-3">
+                            <div class="text-emerald-400">
+                                <i class="fa-solid fa-check-circle"></i>
+                            </div>
+                            <div>
+                                <div class="font-medium">Everything in sync</div>
+                                <div class="text-zinc-400 text-xs">3 tasks due today • 1 warranty expires soon</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer hint -->
+    <footer class="text-center py-8 text-xs text-zinc-600">
+        Built with ❤️ in Go • Your private life OS
+    </footer>
+
+    <script>
+        // Simple Tailwind script already included via CDN
+        // You can replace the picsum image with your own later
+    </script>
+</body>
+</html>
