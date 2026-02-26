@@ -2,6 +2,7 @@ package bot
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/ManaGor/models"
 
@@ -27,16 +28,14 @@ func StartBot(runCtx *models.RunCtx) error {
 			continue
 		}
 		
-		switch update.Message.Command() {
-		case "todos":
-			fmt.Println("todos command was called on Telegram")
-			reply := "todos comand was received - this is the reply from the Go Application"
-			bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, reply))
-		case "addtodo":
-			text := update.Message.CommandArguments()
-			fmt.Printf("addtodo was received with arguments: %s\n", text)
-
-			reply := "addtodo comand was received - this is the reply from the Go Application"
+		switch {
+		case strings.Contains(update.Message.Command(), "todo"):
+			err := TodoBot(runCtx, bot, update) 
+			if err != nil {
+				return err
+			}
+		case strings.Contains(update.Message.Command(), "cal"):
+			reply := "Calendar command was called.\n"	
 			bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, reply))
 		}
 	}
