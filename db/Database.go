@@ -14,7 +14,6 @@ func InitDB(runCtx *models.RunCtx) error {
 	if err != nil {
 		return fmt.Errorf("db Validation failed: %v", err)
 	}
-	defer db.Close()
 
 	if err := db.Ping(); err != nil {
 		return fmt.Errorf("error pinging DB: %v", err)
