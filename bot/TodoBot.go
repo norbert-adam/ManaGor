@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/ManaGor/models"
 
@@ -25,6 +26,18 @@ Available filters:
 	- Deleted
 `
 
+var addTodoHelpMessage string = `
+	Please provide Todo details in the following format:
+            title Buy Milk				- mandatory!
+            due 2026-10-12
+            priority 3					- between 1-5
+            assigned John
+            category Shopping
+            notes 1.5% or 2%
+            tags groceries,weekly		- comma-separated list
+			reminder 2026-10-11 13:15
+`
+
 func TodoBot(runCtx *models.RunCtx, bot *tgbotapi.BotAPI, update tgbotapi.Update) error {
 
 	switch update.Message.Command() {
@@ -37,11 +50,22 @@ func TodoBot(runCtx *models.RunCtx, bot *tgbotapi.BotAPI, update tgbotapi.Update
 		bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, replyStr))
 
 	case "addtodo":
-		text := update.Message.CommandArguments()
-		fmt.Printf("addtodo was received with arguments: %s\n", text)
-
-		reply := "addtodo comand was received - this is the reply from the Go Application"
-		bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, reply))
+		arguments := update.Message.CommandArguments()
+		if arguments == "" {
+			bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, addTodoHelpMessage))
+		} else {
+			todo, err := todoFromBotMessage(arguments)
+			if err != nil {
+				replyStr := fmt.Sprintf("❌ Error parsing Todo from input: %v\n", err)
+				bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, replyStr))
+				return nil
+			}
+			if err := models.CreateToDo(runCtx, todo); err != nil {
+				bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "❌ Failed to save Todo in Database: "+err.Error()))
+				return nil
+			}
+			bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "✅ Todo added successfully: "+todo.Title))
+		}
 	}
 
 	return nil
@@ -185,4 +209,95 @@ func escapeMarkdownV2(text string) string {
 		"!",  `\!`,
     )
     return replacer.Replace(text)
+}
+
+
+func todoFromBotMessage(args string) (models.Todo, error) {
+    if strings.TrimSpace(args) == "" {
+        return models.Todo{}, fmt.Errorf(
+            "please provide todo details:\n" +
+            "title <text>\n" +
+            "due <YYYY-MM-DD>\n" +
+            "priority <1-5>\n" +
+            "assigned <name>\n" +
+            "category <text>\n" +
+            "notes <text>\n" +
+            "tags <a,b,c>\n" +
+            "reminder <YYYY-MM-DD HH:MM>",
+        )
+    }
+
+    var (
+        title string
+        opts  []func(*models.Todo)
+    )
+
+    lines := strings.Split(strings.TrimSpace(args), "\n")
+
+    for _, line := range lines {
+        line = strings.TrimSpace(line)
+        if line == "" {
+            continue
+        }
+
+        // Split into key and value on the first space only
+        parts := strings.SplitN(line, " ", 2)
+        if len(parts) != 2 {
+            return models.Todo{}, fmt.Errorf("invalid line %q, expected: key value", line)
+        }
+
+        key   := strings.ToLower(strings.TrimSpace(parts[0]))
+        value := strings.TrimSpace(parts[1])
+
+        switch key {
+        case "title":
+            title = value
+
+        case "due":
+            d, err := time.Parse("2006-01-02", value)
+            if err != nil {
+                return models.Todo{}, fmt.Errorf("invalid due date %q, use YYYY-MM-DD", value)
+            }
+            opts = append(opts, models.WithDueDate(d))
+
+        case "priority":
+            p, err := strconv.Atoi(value)
+            if err != nil {
+                return models.Todo{}, fmt.Errorf("priority must be a number 1-5")
+            }
+            opts = append(opts, models.WithPriority(p))
+
+        case "assigned":
+            opts = append(opts, models.WithAssignedTo(value))
+
+        case "category":
+            opts = append(opts, models.WithCategory(value))
+
+        case "notes":
+            opts = append(opts, models.WithNotes(value))
+
+        case "tags":
+            tags := strings.Split(value, ",")
+            for i, tag := range tags {
+                tags[i] = strings.TrimSpace(tag)
+            }
+            opts = append(opts, models.WithTags(tags))
+
+        case "reminder":
+            r, err := time.Parse("2006-01-02 15:04", value)
+            if err != nil {
+                return models.Todo{}, fmt.Errorf("invalid reminder %q, use YYYY-MM-DD HH:MM", value)
+            }
+            opts = append(opts, models.WithReminderAt(r))
+
+        default:
+            return models.Todo{}, fmt.Errorf("unknown key %q", key)
+        }
+    }
+
+    if title == "" {
+        return models.Todo{}, fmt.Errorf("title is required")
+    }
+
+    return models.NewTodo(title, opts...)
 }
