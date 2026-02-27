@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strings"
 	"time"
-
 )
 
 type Todo struct {
@@ -28,7 +27,8 @@ type Todo struct {
 
 
 // NewTodo is the constructor for the Todo struct - validates input and sets defaults.
-// As the Todo struct has optional arguments, 
+// As the Todo struct has optional fields, the constructor takes a variable length []func(*Todo).
+// Each func(*Todo) - if included - sets an optional field in the Todo struct.
 func NewTodo(title string, opts ...func(*Todo)) (Todo, error) {
     if strings.TrimSpace(title) == "" {
         return Todo{}, fmt.Errorf("title cannot be empty")
@@ -78,7 +78,8 @@ func validateTodo(t Todo) error {
     return nil
 }
 
-// Functional options for optional fields — callers use these to set what they need
+// Functional options for optional fields — callers use these to set what they need.
+
 func WithDueDate(d time.Time) func(*Todo) {
     return func(t *Todo) { t.DueDate = &d }
 }
@@ -123,6 +124,7 @@ func (t Todo) GetTags() ([]string, error) {
 	return tags, err
 }
 
+// CreateToDo takes a Todo struct as argument and stores it in the database.
 func CreateToDo(runCtx *RunCtx, t Todo) error {
 	fmt.Println("CreateToDo functions.")
 	_, err := runCtx.DB.Exec(`
@@ -148,7 +150,11 @@ func CreateToDo(runCtx *RunCtx, t Todo) error {
 }
 
 
-func UpdateToDo(runCtx *RunCtx) error {
-	fmt.Println("Update ToDo function.")
+func UpdateToDo(runCtx *RunCtx, id int64, property string) error {
+	todo, err := GetToDoByID(runCtx, id)
+	if err != nil {
+		return err
+	}
+	fmt.Println("Todo: ", todo)
 	return nil
 }
