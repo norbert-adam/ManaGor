@@ -11,7 +11,7 @@ import (
 )
 
 var filtersStr string = `
-Available filters
+Available filters:
 	- DueDate
 	- AssignedTo
 	- Status
@@ -29,30 +29,11 @@ func TodoBot(runCtx *models.RunCtx, bot *tgbotapi.BotAPI, update tgbotapi.Update
 
 	switch update.Message.Command() {
 	case "listtodo":
-		replyStr, err := listTodo(runCtx, update)
-		if err != nil {
-			return err
-		}
+		replyStr := listTodo(runCtx, update)
 		bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, replyStr))
 
 	case "selecttodo":
-		arguments := update.Message.CommandArguments()
-		if arguments == "" {
-			bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "No Todo ID was provided."))
-			return nil
-		}
-		id, err := strconv.ParseInt(arguments, 10, 64)
-		if err != nil {
-			return err
-		}
-		todo, err := models.GetToDoByID(runCtx, id)
-		if err != nil {
-			return err
-		}
-		replyStr, err := formatToDo(&todo)
-		if err != nil {
-			return err
-		}
+		replyStr := selectTodo(runCtx, update)	
 		bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, replyStr))
 
 	case "addtodo":
@@ -66,17 +47,17 @@ func TodoBot(runCtx *models.RunCtx, bot *tgbotapi.BotAPI, update tgbotapi.Update
 	return nil
 }
 
-func listTodo(runCtx *models.RunCtx, update tgbotapi.Update) (string, error) {
+func listTodo(runCtx *models.RunCtx, update tgbotapi.Update) string {
 	arguments := update.Message.CommandArguments()
 
 	switch {
 	case arguments == "filters":
-		return filtersStr, nil
+		return filtersStr
 
 	case arguments == "":
 		todoList, err := models.GetAllToDos(runCtx)
 		if err != nil {
-			return "", err
+			return fmt.Sprintf("Error listing all Todos: %v\n", err)
 		}
 
 		var sb strings.Builder
@@ -84,19 +65,47 @@ func listTodo(runCtx *models.RunCtx, update tgbotapi.Update) (string, error) {
 			sb.WriteString(fmt.Sprintf("%d. %s (ID: %d)\n", i + 1, t.Title, t.ID))
 		}
 
-		return sb.String(), nil
+		return sb.String()
+
+	case strings.Contains(arguments, " "):
+		args := strings.SplitN(arguments, " ", 2)		
+		filter := args[0]
+		fValue := args[1]
+
+		return fmt.Sprintf("filter: %s, value: %s\n", filter, fValue)
+
 
 	case !strings.Contains(arguments, " ") && arguments != "filters":
-		return "Unknown argument!", nil
+		return "Unknown argument!"
 
 
 	default:
-		return "Unknown arguments", nil
+		return "Unknown arguments"
 	}
 }
 
+func selectTodo(runCtx *models.RunCtx, update tgbotapi.Update) string {
 
-func formatToDo(t *models.Todo) (string, error) {
+	arguments := update.Message.CommandArguments()
+	if arguments == "" {
+		return "No Todo ID was provided."
+	}
+	id, err := strconv.ParseInt(arguments, 10, 64)
+	if err != nil {
+		return fmt.Sprintf("Error parsing ID: %v\n", err)
+	}
+	todo, err := models.GetToDoByID(runCtx, id)
+	if err != nil {
+		return fmt.Sprintf("Error getting Todo by ID: %v\n", err)
+	}
+
+	replyStr := formatToDo(&todo)
+
+	return replyStr
+}
+
+
+func formatToDo(t *models.Todo) string {
     statusEmoji := "⏳"
     switch t.Status {
     case "done":
@@ -135,7 +144,7 @@ func formatToDo(t *models.Todo) (string, error) {
     categoryEsc := escapeMarkdownV2(t.Category)
 
     return fmt.Sprintf(
-        "*%s %s*\n"+
+        "%s %s\n"+
             "👤 Assigned to: %s\n"+
             "📅 Due: %s\n"+
             "⭐ Priority: %d\n"+
@@ -148,7 +157,7 @@ func formatToDo(t *models.Todo) (string, error) {
 		categoryEsc,
         tagsStr,
         notesStr,
-    ), nil
+    )
 }
 
 func escapeMarkdownV2(text string) string {
@@ -163,7 +172,7 @@ func escapeMarkdownV2(text string) string {
 		"(",  `\(`,
 		")",  `\)`,
 		"~",  `\~`,
-		"`",  "\\`",   // ← this was the problem line (fixed)
+		"`",  "\\`",  
 		">",  `\>`,
 		"#",  `\#`,
 		"+",  `\+`,
