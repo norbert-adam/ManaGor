@@ -8,7 +8,6 @@ import (
 
 )
 
-
 type Todo struct {
 	ID          int        `json:"id"`           // primary key
 	Title       string     `json:"title"`
@@ -25,6 +24,7 @@ type Todo struct {
 	TagsJSON    string     `json:"-"`                      // raw JSON from DB column (do NOT expose directly)
 	Deleted     bool       `json:"deleted"`
 }
+
 
 func (t Todo) GetTags() ([]string, error) {
 	if t.TagsJSON == "" {
