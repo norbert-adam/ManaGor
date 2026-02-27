@@ -4,6 +4,7 @@ import (
 	// "database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 )
@@ -26,6 +27,93 @@ type Todo struct {
 }
 
 
+// NewTodo is the constructor for the Todo struct - validates input and sets defaults.
+// As the Todo struct has optional arguments, 
+func NewTodo(title string, opts ...func(*Todo)) (Todo, error) {
+    if strings.TrimSpace(title) == "" {
+        return Todo{}, fmt.Errorf("title cannot be empty")
+    }
+
+    now := time.Now()
+
+    t := Todo{
+        Title:      strings.TrimSpace(title),
+        Status:     "pending",
+        Priority:   3,
+        CreatedAt:  now,
+        UpdatedAt:  now,
+        Deleted:    false,
+    }
+
+    // Apply optional fields via functional options
+	// We loop through a list of functions that take a Todo struct as argument
+    for _, opt := range opts {
+        opt(&t)
+    }
+
+    // Validate after options are applied
+    if err := validateTodo(t); err != nil {
+        return Todo{}, err
+    }
+
+    return t, nil
+}
+
+func validateTodo(t Todo) error {
+    validStatuses := map[string]bool{
+        "pending": true, "in_progress": true, "done": true, "cancelled": true,
+    }
+    if !validStatuses[t.Status] {
+        return fmt.Errorf("invalid status: %s", t.Status)
+    }
+
+    if t.Priority < 1 || t.Priority > 5 {
+        return fmt.Errorf("priority must be between 1 and 5")
+    }
+
+    if t.DueDate != nil && t.DueDate.Before(time.Now()) {
+        return fmt.Errorf("due date cannot be in the past")
+    }
+
+    return nil
+}
+
+// Functional options for optional fields — callers use these to set what they need
+func WithDueDate(d time.Time) func(*Todo) {
+    return func(t *Todo) { t.DueDate = &d }
+}
+
+func WithPriority(p int) func(*Todo) {
+    return func(t *Todo) { t.Priority = p }
+}
+
+func WithAssignedTo(name string) func(*Todo) {
+    return func(t *Todo) { t.AssignedTo = name }
+}
+
+func WithCategory(cat string) func(*Todo) {
+    return func(t *Todo) { t.Category = cat }
+}
+
+func WithNotes(notes string) func(*Todo) {
+    return func(t *Todo) { t.Notes = notes }
+}
+
+func WithTags(tags []string) func(*Todo) {
+    return func(t *Todo) {
+        b, _ := json.Marshal(tags)
+        t.TagsJSON = string(b)
+    }
+}
+
+func WithStatus(s string) func(*Todo) {
+    return func(t *Todo) { t.Status = s }
+}
+
+func WithReminderAt(r time.Time) func(*Todo) {
+    return func(t *Todo) { t.ReminderAt = &r }
+}
+
 func (t Todo) GetTags() ([]string, error) {
 	if t.TagsJSON == "" {
 		return []string{}, nil
@@ -35,25 +123,29 @@ func (t Todo) GetTags() ([]string, error) {
 	return tags, err
 }
 
-func (t *Todo) SetTags(tags []string) error {
-	if len(tags) == 0 {
-		t.TagsJSON = ""
-		return nil
-	}
-	b, err := json.Marshal(tags)
-	if err != nil {
-		return err
-	}
-	t.TagsJSON = string(b)
-	return nil
-}
-
-
-func CreateToDo(runCtx *RunCtx) error {
+func CreateToDo(runCtx *RunCtx, t Todo) error {
 	fmt.Println("CreateToDo functions.")
-	return nil
+	_, err := runCtx.DB.Exec(`
+		INSERT INTO todos 
+			(title, due_date, assigned_to, status, notes, priority,
+			 reminder_at, category, tags, deleted, created_at, updated_at)
+		VALUES
+			(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		t.Title,
+		t.DueDate,
+		t.AssignedTo,
+		t.Status,
+		t.Notes,
+		t.Priority,
+		t.ReminderAt,
+		t.Category,
+		t.TagsJSON,
+		t.Deleted,
+		t.CreatedAt,
+		t.UpdatedAt,
+    )
+    return err
 }
-
 
 
 func UpdateToDo(runCtx *RunCtx) error {
