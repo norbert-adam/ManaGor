@@ -28,6 +28,7 @@ Available filters:
 
 func TodoBot(runCtx *models.RunCtx, bot *tgbotapi.BotAPI, update tgbotapi.Update) error {
 
+
 	switch update.Message.Command() {
 	case "listtodo":
 		replyStr := listTodo(runCtx, update)
@@ -49,6 +50,27 @@ func TodoBot(runCtx *models.RunCtx, bot *tgbotapi.BotAPI, update tgbotapi.Update
 			return nil
 		}
 		bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "✅ Todo added successfully: "+todo.Title))
+
+	case "updatetodo":
+		arguments := update.Message.CommandArguments()
+		id, valueList, err := updateTodoFromMessage(arguments)
+		if err != nil {
+			bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Error parsing values: "+err.Error()))
+			return nil
+		}
+		err = models.UpdateToDo(runCtx, id, valueList)
+		if err != nil {
+			bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Error updating Todo: "+err.Error()))
+			return nil
+		}
+		bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Todo successfully updated!"))
+
+	case "deletetodo":
+		arguments := update.Message.CommandArguments()
+		
+
+	default:
+		bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Unknown command!"))
 	}
 
 	return nil
@@ -107,10 +129,64 @@ func selectTodo(runCtx *models.RunCtx, update tgbotapi.Update) string {
 	return replyStr
 }
 
+func updateTodoFromMessage(args string) (int64, map[string]string, error) {
+    if strings.TrimSpace(args) == "" {
+        return 0, nil, fmt.Errorf(
+	"Please provide update information for Todo in the following format:\n" +
+			"/updatetodo 3				- number is Todo ID\n" +
+            "title Buy Milk				- mandatory!\n" +
+            "due 2026-10-12\n" +
+            "priority 3					- between 1-5\n" +
+            "assigned John\n" +
+            "category Shopping\n" +
+            "notes 1.5% or 2%\n" +
+            "tags groceries,weekly		- comma-separated list\n" +
+			"reminder 2026-10-11 13:15",
+        )
+    }
+
+    lines := strings.Split(strings.TrimSpace(args), "\n")
+	
+	valueList := make(map[string]string)
+	var id int64
+
+    for i, line := range lines {
+        line = strings.TrimSpace(line)
+        if line == "" {
+            continue
+        }
+
+		if i == 0 {
+			parseId, err := strconv.ParseInt(line, 0, 64)
+			if err != nil {
+				return 0, nil, fmt.Errorf("invalid Todo ID")
+			}
+			id = parseId
+			fmt.Printf("ID parsed: %d\n", id)
+			continue
+		}
+
+        // Split into key and value on the first space only
+        parts := strings.SplitN(line, " ", 2)
+        if len(parts) != 2 {
+            return 0, nil, fmt.Errorf("invalid line %q, expected: key value", line)
+        }
+
+        key   := strings.ToLower(strings.TrimSpace(parts[0]))
+        value := strings.TrimSpace(parts[1])
+
+		valueList[key] = value
+    }
+
+	return id, valueList, nil
+
+}
+
 func todoFromBotMessage(args string) (models.Todo, error) {
     if strings.TrimSpace(args) == "" {
         return models.Todo{}, fmt.Errorf(
 	"Please provide Todo details in the following format:\n" +
+			"/addtodo\n" +
             "title Buy Milk				- mandatory!\n" +
             "due 2026-10-12\n" +
             "priority 3					- between 1-5\n" +
@@ -195,6 +271,10 @@ func todoFromBotMessage(args string) (models.Todo, error) {
     }
 
     return models.NewTodo(title, opts...)
+}
+
+func deleteTodoFromMessage(args string) error {
+
 }
 
 

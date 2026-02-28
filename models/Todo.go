@@ -25,6 +25,22 @@ type Todo struct {
 	Deleted     bool       `json:"deleted"`
 }
 
+var todoFields = map[string]string {
+	"id": "id",
+	"title": "title",
+	"duedate":  "due_date",
+	"assignedto": "assigned_to",
+	"status": "status",
+	"createdat": "created_at",
+	"notes": "notes",
+	"priority": "priority",
+	"completedat": "completed_at",
+	"updatedat": "updated_at",
+	"reminderat": "reminder_at",
+	"category": "category",
+	"tagsjson": "tags",
+	"deleted": "deleted",
+}
 
 // NewTodo is the constructor for the Todo struct - validates input and sets defaults.
 // As the Todo struct has optional fields, the constructor takes a variable length []func(*Todo).
@@ -150,11 +166,44 @@ func CreateToDo(runCtx *RunCtx, t Todo) error {
 }
 
 
-func UpdateToDo(runCtx *RunCtx, id int64, property string) error {
-	todo, err := GetToDoByID(runCtx, id)
-	if err != nil {
-		return err
+func UpdateToDo(runCtx *RunCtx, id int64, valueList map[string]string) error {
+
+	if len(valueList) == 0 {
+		return nil
 	}
-	fmt.Println("Todo: ", todo)
+
+	var setKeys []string
+	var values []any
+
+	for k, v := range valueList {
+		dbColumn, ok := todoFields[k]
+		if !ok {
+			return fmt.Errorf("unknown todo filed: %s", k)
+		}
+
+		setKeys = append(setKeys, dbColumn+" = ?")
+		values = append(values, v)
+	}
+
+	query := fmt.Sprintf("UPDATE todos SET %s WHERE id = ?", strings.Join(setKeys, ", "))
+
+	idStr := fmt.Sprintf("%d", id)
+	values = append(values, idStr)
+
+	_, err := runCtx.DB.Exec(query, values...)
+	if err != nil {
+		return fmt.Errorf("failed to update Todo %d: %v", id, err)
+	}
+
 	return nil
+}
+
+func DeleteToDo(runCtx *RunCtx, id int64, force bool) error {
+	if !force {
+		fmt.Println("Not deleting, only setting the 'Deleted' field to true.")
+		return nil
+	} else {
+		fmt.Println("Actually deleting.")
+		return nil
+	}
 }
