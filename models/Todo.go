@@ -198,12 +198,29 @@ func UpdateToDo(runCtx *RunCtx, id int64, valueList map[string]string) error {
 	return nil
 }
 
-func DeleteToDo(runCtx *RunCtx, id int64, force bool) error {
-	if !force {
-		fmt.Println("Not deleting, only setting the 'Deleted' field to true.")
-		return nil
-	} else {
-		fmt.Println("Actually deleting.")
-		return nil
+func DeleteToDo(runCtx *RunCtx, id int64) error {
+	_, err := runCtx.DB.Exec("DELETE FROM todos WHERE id = ?", id)
+
+	if err != nil {
+		return fmt.Errorf("failed to delete Todo %d: %v", id, err)
 	}
+
+	return nil
+}
+
+
+func SearchTodo(runCtx *RunCtx, s string) (*[]Todo, error) {
+	var todos []Todo
+	tList, err := GetAllToDos(runCtx)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, t := range tList {
+		if strings.Contains(t.Title, s) || strings.Contains(t.Notes, s) || strings.Contains(t.Category, s) || strings.Contains(t.AssignedTo, s) {
+			todos = append(todos, t)
+		}
+	}
+
+	return &todos, nil
 }

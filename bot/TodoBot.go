@@ -67,7 +67,41 @@ func TodoBot(runCtx *models.RunCtx, bot *tgbotapi.BotAPI, update tgbotapi.Update
 
 	case "deletetodo":
 		arguments := update.Message.CommandArguments()
-		
+		id, valueList, err := deleteTodoFromMessage(arguments)
+		if err != nil {
+			bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Error deleting Todo: "+err.Error()))
+			return nil
+		}
+		if valueList != nil {
+			err = models.UpdateToDo(runCtx, id, valueList)
+			if err != nil {
+				bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Error deleting Todo: "+err.Error()))
+				return nil
+			}
+			bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Todo successfully updated!"))
+		} else {
+			err = models.DeleteToDo(runCtx, id)
+			if err != nil {
+				bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Error deleting Todo: "+err.Error()))
+				return nil
+			}
+
+			bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Todo successfully deleted!"))
+		}
+	
+	case "searchtodo":
+		arguments := strings.TrimSpace(update.Message.CommandArguments())
+		if arguments == "" { 
+			bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "No search term was provided!"))
+			return nil
+		}
+		todos, err := models.SearchTodo(runCtx, arguments)
+		if err != nil {
+			bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "No search term was provided!"))
+			return nil
+		}
+		reply := printTodoList(*todos)	
+		bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, reply))
 
 	default:
 		bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Unknown command!"))
@@ -273,8 +307,32 @@ func todoFromBotMessage(args string) (models.Todo, error) {
     return models.NewTodo(title, opts...)
 }
 
-func deleteTodoFromMessage(args string) error {
+func deleteTodoFromMessage(args string) (int64, map[string]string, error) {
+	args = strings.TrimSpace(args)
+    if args == "" {
+        return 0, nil, fmt.Errorf("missing Todo ID")
+    }
 
+	if strings.Contains(args, " ") {
+		parts := strings.SplitN(args, " ", 2)
+		if parts[1] != "f" && parts[1] != "force" {
+			return 0, nil, fmt.Errorf("error with 2nd arguments - command should be /deletetodo ID f/force")
+		}
+		id, err := strconv.ParseInt(parts[0], 0, 64)
+		if err != nil {
+			return 0, nil, fmt.Errorf("could not parse ID from %s", args)
+		}
+		return id, nil, nil
+	} else {
+		id, err := strconv.ParseInt(args, 0, 64)
+		if err != nil {
+			return 0, nil, fmt.Errorf("could not parse ID from %s", args)
+		}
+		delete := make(map[string]string)
+		delete["deleted"] = "true"
+
+		return id, delete, nil
+	}
 }
 
 
