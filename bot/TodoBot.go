@@ -126,9 +126,11 @@ func listTodo(runCtx *models.RunCtx, update tgbotapi.Update) string {
 		return printTodoList(todoList)
 
 	case strings.Contains(arguments, " "):
+		fmt.Printf("Arguments passed to ParseFilter: %s\n", arguments)
 		filter, err := models.ParseFilter(arguments)
+		fmt.Printf("TodoFilter returned by ParseFilter: %+v\n", filter)
 		if err != nil {
-			return fmt.Sprintf("Usage: /filter <name> <value>\n"+err.Error())
+			return fmt.Sprintf("Usage: /listtodo <name> <value>\n"+err.Error())
 		}
 		todos, err := models.GetFilteredTodos(runCtx, filter)
 
@@ -223,6 +225,7 @@ func todoFromBotMessage(args string) (models.Todo, error) {
 			"/addtodo\n" +
             "title Buy Milk				- mandatory!\n" +
             "due 2026-10-12\n" +
+			"status pending				- pending/in_progress/done/cancelled\n" +
             "priority 3					- between 1-5\n" +
             "assigned John\n" +
             "category Shopping\n" +
@@ -248,7 +251,7 @@ func todoFromBotMessage(args string) (models.Todo, error) {
         // Split into key and value on the first space only
         parts := strings.SplitN(line, " ", 2)
         if len(parts) != 2 {
-            return models.Todo{}, fmt.Errorf("invalid line %q, expected: key value", line)
+			return models.Todo{}, fmt.Errorf("invalid line %q, expected format: <key> <value>", line)
         }
 
         key   := strings.ToLower(strings.TrimSpace(parts[0]))
@@ -258,10 +261,10 @@ func todoFromBotMessage(args string) (models.Todo, error) {
         case "title":
             title = value
 
-        case "due":
+        case "due", "duedate":
             d, err := time.Parse("2006-01-02", value)
             if err != nil {
-                return models.Todo{}, fmt.Errorf("invalid due date %q, use YYYY-MM-DD", value)
+                return models.Todo{}, fmt.Errorf("invalid due date %q, use YYYY-MM-DD format", value)
             }
             opts = append(opts, models.WithDueDate(d))
 
@@ -287,6 +290,13 @@ func todoFromBotMessage(args string) (models.Todo, error) {
                 tags[i] = strings.TrimSpace(tag)
             }
             opts = append(opts, models.WithTags(tags))
+
+		case "status":
+			valid := map[string]bool{"pending": true, "in_progress": true, "done": true, "cancelled": true}
+			if !valid[value] {
+				return models.Todo{}, fmt.Errorf("invalid status: %s", value)
+			}
+			opts = append(opts, models.WithStatus(value))
 
         case "reminder":
             r, err := time.Parse("2006-01-02 15:04", value)
@@ -316,7 +326,7 @@ func deleteTodoFromMessage(args string) (int64, map[string]string, error) {
 	if strings.Contains(args, " ") {
 		parts := strings.SplitN(args, " ", 2)
 		if parts[1] != "f" && parts[1] != "force" {
-			return 0, nil, fmt.Errorf("error with 2nd arguments - command should be /deletetodo ID f/force")
+			return 0, nil, fmt.Errorf("error with 2nd arguments - command should be /deletetodo <ID> <f>/<force>")
 		}
 		id, err := strconv.ParseInt(parts[0], 0, 64)
 		if err != nil {
@@ -363,7 +373,7 @@ func formatToDo(t *models.Todo) string {
 
     dueStr := "N/A"
     if t.DueDate != nil {
-        dueStr = t.DueDate.Format("Mon 02 Jan 15:04") // e.g. "Mon 02 Mar 18:00"
+        dueStr = t.DueDate.Format(time.ANSIC) // e.g. "Mon 02 Mar 18:00"
     }
 
     assigned := t.AssignedTo

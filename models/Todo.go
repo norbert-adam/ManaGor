@@ -50,6 +50,7 @@ func NewTodo(title string, opts ...func(*Todo)) (Todo, error) {
         return Todo{}, fmt.Errorf("title cannot be empty")
     }
 
+	// This returns a 
     now := time.Now()
 
     t := Todo{
@@ -142,7 +143,7 @@ func (t Todo) GetTags() ([]string, error) {
 
 // CreateToDo takes a Todo struct as argument and stores it in the database.
 func CreateToDo(runCtx *RunCtx, t Todo) error {
-	fmt.Println("CreateToDo functions.")
+
 	_, err := runCtx.DB.Exec(`
 		INSERT INTO todos 
 			(title, due_date, assigned_to, status, notes, priority,
@@ -178,7 +179,7 @@ func UpdateToDo(runCtx *RunCtx, id int64, valueList map[string]string) error {
 	for k, v := range valueList {
 		dbColumn, ok := todoFields[k]
 		if !ok {
-			return fmt.Errorf("unknown todo filed: %s", k)
+			return fmt.Errorf("unknown Todo field: %s", k)
 		}
 
 		setKeys = append(setKeys, dbColumn+" = ?")

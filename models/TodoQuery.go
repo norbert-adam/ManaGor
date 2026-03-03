@@ -11,7 +11,7 @@ import (
 func GetAllToDos(runCtx *RunCtx) ([]Todo, error) {
 	db := runCtx.DB
 	rows, err := db.Query(
-		"SELECT id, title, due_date, assigned_to, status, created_at, notes, priority, completed_at, updated_at, reminder_at, category, tags, deleted FROM todos ORDER BY created_at DESC",
+		"SELECT id, title, due_date, assigned_to, status, created_at, notes, priority, completed_at, updated_at, reminder_at, category, tags, deleted FROM todos ORDER BY id ASC",
     )
     if err != nil {
         return nil, err
