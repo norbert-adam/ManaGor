@@ -28,6 +28,7 @@ Available filters:
 
 func TodoBot(runCtx *models.RunCtx, bot *tgbotapi.BotAPI, update tgbotapi.Update) error {
 
+
 	switch update.Message.Command() {
 	case "listtodo":
 		replyStr := listTodo(runCtx, update)
@@ -49,6 +50,61 @@ func TodoBot(runCtx *models.RunCtx, bot *tgbotapi.BotAPI, update tgbotapi.Update
 			return nil
 		}
 		bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "✅ Todo added successfully: "+todo.Title))
+
+	case "updatetodo":
+		arguments := update.Message.CommandArguments()
+		id, valueList, err := updateTodoFromMessage(arguments)
+		if err != nil {
+			bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Error parsing values: "+err.Error()))
+			return nil
+		}
+		err = models.UpdateToDo(runCtx, id, valueList)
+		if err != nil {
+			bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Error updating Todo: "+err.Error()))
+			return nil
+		}
+		bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Todo successfully updated!"))
+
+	case "deletetodo":
+		arguments := update.Message.CommandArguments()
+		id, valueList, err := deleteTodoFromMessage(arguments)
+		if err != nil {
+			bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Error deleting Todo: "+err.Error()))
+			return nil
+		}
+		if valueList != nil {
+			err = models.UpdateToDo(runCtx, id, valueList)
+			if err != nil {
+				bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Error deleting Todo: "+err.Error()))
+				return nil
+			}
+			bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Todo successfully updated!"))
+		} else {
+			err = models.DeleteToDo(runCtx, id)
+			if err != nil {
+				bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Error deleting Todo: "+err.Error()))
+				return nil
+			}
+
+			bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Todo successfully deleted!"))
+		}
+	
+	case "searchtodo":
+		arguments := strings.TrimSpace(update.Message.CommandArguments())
+		if arguments == "" { 
+			bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "No search term was provided!"))
+			return nil
+		}
+		todos, err := models.SearchTodo(runCtx, arguments)
+		if err != nil {
+			bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "No search term was provided!"))
+			return nil
+		}
+		reply := printTodoList(*todos)	
+		bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, reply))
+
+	default:
+		bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Unknown command!"))
 	}
 
 	return nil
@@ -70,9 +126,11 @@ func listTodo(runCtx *models.RunCtx, update tgbotapi.Update) string {
 		return printTodoList(todoList)
 
 	case strings.Contains(arguments, " "):
+		fmt.Printf("Arguments passed to ParseFilter: %s\n", arguments)
 		filter, err := models.ParseFilter(arguments)
+		fmt.Printf("TodoFilter returned by ParseFilter: %+v\n", filter)
 		if err != nil {
-			return fmt.Sprintf("Usage: /filter <name> <value>\n"+err.Error())
+			return fmt.Sprintf("Usage: /listtodo <name> <value>\n"+err.Error())
 		}
 		todos, err := models.GetFilteredTodos(runCtx, filter)
 
@@ -107,12 +165,67 @@ func selectTodo(runCtx *models.RunCtx, update tgbotapi.Update) string {
 	return replyStr
 }
 
+func updateTodoFromMessage(args string) (int64, map[string]string, error) {
+    if strings.TrimSpace(args) == "" {
+        return 0, nil, fmt.Errorf(
+	"Please provide update information for Todo in the following format:\n" +
+			"/updatetodo 3				- number is Todo ID\n" +
+            "title Buy Milk				- mandatory!\n" +
+            "due 2026-10-12\n" +
+            "priority 3					- between 1-5\n" +
+            "assigned John\n" +
+            "category Shopping\n" +
+            "notes 1.5% or 2%\n" +
+            "tags groceries,weekly		- comma-separated list\n" +
+			"reminder 2026-10-11 13:15",
+        )
+    }
+
+    lines := strings.Split(strings.TrimSpace(args), "\n")
+	
+	valueList := make(map[string]string)
+	var id int64
+
+    for i, line := range lines {
+        line = strings.TrimSpace(line)
+        if line == "" {
+            continue
+        }
+
+		if i == 0 {
+			parseId, err := strconv.ParseInt(line, 0, 64)
+			if err != nil {
+				return 0, nil, fmt.Errorf("invalid Todo ID")
+			}
+			id = parseId
+			fmt.Printf("ID parsed: %d\n", id)
+			continue
+		}
+
+        // Split into key and value on the first space only
+        parts := strings.SplitN(line, " ", 2)
+        if len(parts) != 2 {
+            return 0, nil, fmt.Errorf("invalid line %q, expected: key value", line)
+        }
+
+        key   := strings.ToLower(strings.TrimSpace(parts[0]))
+        value := strings.TrimSpace(parts[1])
+
+		valueList[key] = value
+    }
+
+	return id, valueList, nil
+
+}
+
 func todoFromBotMessage(args string) (models.Todo, error) {
     if strings.TrimSpace(args) == "" {
         return models.Todo{}, fmt.Errorf(
 	"Please provide Todo details in the following format:\n" +
+			"/addtodo\n" +
             "title Buy Milk				- mandatory!\n" +
             "due 2026-10-12\n" +
+			"status pending				- pending/in_progress/done/cancelled\n" +
             "priority 3					- between 1-5\n" +
             "assigned John\n" +
             "category Shopping\n" +
@@ -138,7 +251,7 @@ func todoFromBotMessage(args string) (models.Todo, error) {
         // Split into key and value on the first space only
         parts := strings.SplitN(line, " ", 2)
         if len(parts) != 2 {
-            return models.Todo{}, fmt.Errorf("invalid line %q, expected: key value", line)
+			return models.Todo{}, fmt.Errorf("invalid line %q, expected format: <key> <value>", line)
         }
 
         key   := strings.ToLower(strings.TrimSpace(parts[0]))
@@ -148,10 +261,10 @@ func todoFromBotMessage(args string) (models.Todo, error) {
         case "title":
             title = value
 
-        case "due":
+        case "due", "duedate":
             d, err := time.Parse("2006-01-02", value)
             if err != nil {
-                return models.Todo{}, fmt.Errorf("invalid due date %q, use YYYY-MM-DD", value)
+                return models.Todo{}, fmt.Errorf("invalid due date %q, use YYYY-MM-DD format", value)
             }
             opts = append(opts, models.WithDueDate(d))
 
@@ -178,6 +291,13 @@ func todoFromBotMessage(args string) (models.Todo, error) {
             }
             opts = append(opts, models.WithTags(tags))
 
+		case "status":
+			valid := map[string]bool{"pending": true, "in_progress": true, "done": true, "cancelled": true}
+			if !valid[value] {
+				return models.Todo{}, fmt.Errorf("invalid status: %s", value)
+			}
+			opts = append(opts, models.WithStatus(value))
+
         case "reminder":
             r, err := time.Parse("2006-01-02 15:04", value)
             if err != nil {
@@ -195,6 +315,34 @@ func todoFromBotMessage(args string) (models.Todo, error) {
     }
 
     return models.NewTodo(title, opts...)
+}
+
+func deleteTodoFromMessage(args string) (int64, map[string]string, error) {
+	args = strings.TrimSpace(args)
+    if args == "" {
+        return 0, nil, fmt.Errorf("missing Todo ID")
+    }
+
+	if strings.Contains(args, " ") {
+		parts := strings.SplitN(args, " ", 2)
+		if parts[1] != "f" && parts[1] != "force" {
+			return 0, nil, fmt.Errorf("error with 2nd arguments - command should be /deletetodo <ID> <f>/<force>")
+		}
+		id, err := strconv.ParseInt(parts[0], 0, 64)
+		if err != nil {
+			return 0, nil, fmt.Errorf("could not parse ID from %s", args)
+		}
+		return id, nil, nil
+	} else {
+		id, err := strconv.ParseInt(args, 0, 64)
+		if err != nil {
+			return 0, nil, fmt.Errorf("could not parse ID from %s", args)
+		}
+		delete := make(map[string]string)
+		delete["deleted"] = "true"
+
+		return id, delete, nil
+	}
 }
 
 
@@ -225,7 +373,7 @@ func formatToDo(t *models.Todo) string {
 
     dueStr := "N/A"
     if t.DueDate != nil {
-        dueStr = t.DueDate.Format("Mon 02 Jan 15:04") // e.g. "Mon 02 Mar 18:00"
+        dueStr = t.DueDate.Format(time.ANSIC) // e.g. "Mon 02 Mar 18:00"
     }
 
     assigned := t.AssignedTo

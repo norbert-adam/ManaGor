@@ -20,6 +20,13 @@ func StartBot(runCtx *models.RunCtx) error {
 	}
 	updates := bot.GetUpdatesChan(tgbotapi.UpdateConfig{Timeout: 60})
 
+	// bot.Send(tgbotapi.NewMessage(runCtx.TgChatID, "Notification upon start!"))
+	// err = models.UpdateToDo(runCtx, 4, "duedate", "2026-06-12")
+	// if err != nil {
+	// 	return err
+	// }
+
+
 	for update := range updates {
 		if update.Message == nil { continue }
 

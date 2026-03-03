@@ -25,6 +25,22 @@ type Todo struct {
 	Deleted     bool       `json:"deleted"`
 }
 
+var todoFields = map[string]string {
+	"id": "id",
+	"title": "title",
+	"duedate":  "due_date",
+	"assignedto": "assigned_to",
+	"status": "status",
+	"createdat": "created_at",
+	"notes": "notes",
+	"priority": "priority",
+	"completedat": "completed_at",
+	"updatedat": "updated_at",
+	"reminderat": "reminder_at",
+	"category": "category",
+	"tagsjson": "tags",
+	"deleted": "deleted",
+}
 
 // NewTodo is the constructor for the Todo struct - validates input and sets defaults.
 // As the Todo struct has optional fields, the constructor takes a variable length []func(*Todo).
@@ -34,6 +50,7 @@ func NewTodo(title string, opts ...func(*Todo)) (Todo, error) {
         return Todo{}, fmt.Errorf("title cannot be empty")
     }
 
+	// This returns a 
     now := time.Now()
 
     t := Todo{
@@ -126,7 +143,7 @@ func (t Todo) GetTags() ([]string, error) {
 
 // CreateToDo takes a Todo struct as argument and stores it in the database.
 func CreateToDo(runCtx *RunCtx, t Todo) error {
-	fmt.Println("CreateToDo functions.")
+
 	_, err := runCtx.DB.Exec(`
 		INSERT INTO todos 
 			(title, due_date, assigned_to, status, notes, priority,
@@ -150,11 +167,61 @@ func CreateToDo(runCtx *RunCtx, t Todo) error {
 }
 
 
-func UpdateToDo(runCtx *RunCtx, id int64, property string) error {
-	todo, err := GetToDoByID(runCtx, id)
-	if err != nil {
-		return err
+func UpdateToDo(runCtx *RunCtx, id int64, valueList map[string]string) error {
+
+	if len(valueList) == 0 {
+		return nil
 	}
-	fmt.Println("Todo: ", todo)
+
+	var setKeys []string
+	var values []any
+
+	for k, v := range valueList {
+		dbColumn, ok := todoFields[k]
+		if !ok {
+			return fmt.Errorf("unknown Todo field: %s", k)
+		}
+
+		setKeys = append(setKeys, dbColumn+" = ?")
+		values = append(values, v)
+	}
+
+	query := fmt.Sprintf("UPDATE todos SET %s WHERE id = ?", strings.Join(setKeys, ", "))
+
+	idStr := fmt.Sprintf("%d", id)
+	values = append(values, idStr)
+
+	_, err := runCtx.DB.Exec(query, values...)
+	if err != nil {
+		return fmt.Errorf("failed to update Todo %d: %v", id, err)
+	}
+
 	return nil
+}
+
+func DeleteToDo(runCtx *RunCtx, id int64) error {
+	_, err := runCtx.DB.Exec("DELETE FROM todos WHERE id = ?", id)
+
+	if err != nil {
+		return fmt.Errorf("failed to delete Todo %d: %v", id, err)
+	}
+
+	return nil
+}
+
+
+func SearchTodo(runCtx *RunCtx, s string) (*[]Todo, error) {
+	var todos []Todo
+	tList, err := GetAllToDos(runCtx)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, t := range tList {
+		if strings.Contains(t.Title, s) || strings.Contains(t.Notes, s) || strings.Contains(t.Category, s) || strings.Contains(t.AssignedTo, s) {
+			todos = append(todos, t)
+		}
+	}
+
+	return &todos, nil
 }
