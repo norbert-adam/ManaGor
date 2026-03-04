@@ -2,12 +2,22 @@ package bot
 
 import (
 	"fmt"
-	"strings"
+	// "strings"
 
 	"github.com/ManaGor/models"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
+
+
+var botStr string = `
+	Welcome to the ManaGor Application!
+
+	Available commands:
+		/todo
+		/cal
+		
+	`
 
 func StartBot(runCtx *models.RunCtx) error {
 	var allowedUsers = map[int64]bool{
@@ -19,6 +29,7 @@ func StartBot(runCtx *models.RunCtx) error {
 		return fmt.Errorf("error creating Telegram Bot API: %v", err)
 	}
 	updates := bot.GetUpdatesChan(tgbotapi.UpdateConfig{Timeout: 60})
+
 
 	// bot.Send(tgbotapi.NewMessage(runCtx.TgChatID, "Notification upon start!"))
 	// err = models.UpdateToDo(runCtx, 4, "duedate", "2026-06-12")
@@ -34,17 +45,34 @@ func StartBot(runCtx *models.RunCtx) error {
 			bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Unauthorized"))
 			continue
 		}
-		
-		switch {
-		case strings.Contains(update.Message.Command(), "todo"):
-			err := TodoBot(runCtx, bot, update) 
+
+		switch update.Message.Command() {
+		case "start":
+			bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, botStr))
+
+		case "todo":
+			err := TodoBot(runCtx, bot, updates)
 			if err != nil {
 				return err
 			}
-		case strings.Contains(update.Message.Command(), "cal"):
-			reply := "Calendar command was called.\n"	
-			bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, reply))
+		case "cal":
+			bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Calendar was called."))
+
+		default:
+			bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, botStr))
+
 		}
+		
+		// switch {
+		// case strings.Contains(update.Message.Command(), "todo"):
+		// 	err := TodoBot(runCtx, bot, update) 
+		// 	if err != nil {
+		// 		return err
+		// 	}
+		// case strings.Contains(update.Message.Command(), "cal"):
+		// 	reply := "Calendar command was called.\n"	
+		// 	bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, reply))
+		// }
 	}
 
 	return nil

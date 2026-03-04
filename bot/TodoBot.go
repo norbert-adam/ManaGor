@@ -1,6 +1,7 @@
 package bot
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -11,111 +12,102 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-var filtersStr string = `
-Available filters:
-	- DueDate
-	- AssignedTo
-	- Status
-	- CreatedAt
-	- Priority
-	- CompletedAt
-	- UpdatedAt
-	- ReminderAt
-	- Category
-	- Tags
-	- Deleted
-`
 
-func TodoBot(runCtx *models.RunCtx, bot *tgbotapi.BotAPI, update tgbotapi.Update) error {
+// TodoBot function runs the Todo sub-application - returns to the main app on /exit command
+func TodoBot(runCtx *models.RunCtx, bot *tgbotapi.BotAPI, updates tgbotapi.UpdatesChannel) error {
 
+	bot.Send(tgbotapi.NewMessage(runCtx.TgChatID, todoBotStr))
+	var replyStr string
 
-	switch update.Message.Command() {
-	case "listtodo":
-		replyStr := listTodo(runCtx, update)
-		bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, replyStr))
+	for update := range updates {
+		switch update.Message.Command() {
+		case "add":
+			replyStr = addTodo(runCtx, update)
 
-	case "selecttodo":
-		replyStr := selectTodo(runCtx, update)	
-		bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, replyStr))
+		case "delete":
+			replyStr = deleteTodo(runCtx, update)
 
-	case "addtodo":
-		arguments := update.Message.CommandArguments()
-		todo, err := todoFromBotMessage(arguments)
-		if err != nil {
-			bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, err.Error()))
+		case "list":
+			replyStr = listTodo(runCtx, update)
+
+		case "search":
+			replyStr = searchTodo(runCtx, update)
+
+		case "select":
+			replyStr = selectTodo(runCtx, update)	
+
+		case "update":
+			replyStr = updateToDo(runCtx, update)
+
+		case "exit":
 			return nil
-		}
-		if err := models.CreateToDo(runCtx, todo); err != nil {
-			bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "❌ Failed to save Todo in Database: "+err.Error()))
-			return nil
-		}
-		bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "✅ Todo added successfully: "+todo.Title))
 
-	case "updatetodo":
-		arguments := update.Message.CommandArguments()
-		id, valueList, err := updateTodoFromMessage(arguments)
-		if err != nil {
-			bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Error parsing values: "+err.Error()))
-			return nil
+		default:
+			bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Unkown command."))
+			continue
 		}
-		err = models.UpdateToDo(runCtx, id, valueList)
-		if err != nil {
-			bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Error updating Todo: "+err.Error()))
-			return nil
-		}
-		bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Todo successfully updated!"))
-
-	case "deletetodo":
-		arguments := update.Message.CommandArguments()
-		id, valueList, err := deleteTodoFromMessage(arguments)
-		if err != nil {
-			bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Error deleting Todo: "+err.Error()))
-			return nil
-		}
-		if valueList != nil {
-			err = models.UpdateToDo(runCtx, id, valueList)
-			if err != nil {
-				bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Error deleting Todo: "+err.Error()))
-				return nil
-			}
-			bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Todo successfully updated!"))
-		} else {
-			err = models.DeleteToDo(runCtx, id)
-			if err != nil {
-				bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Error deleting Todo: "+err.Error()))
-				return nil
-			}
-
-			bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Todo successfully deleted!"))
-		}
-	
-	case "searchtodo":
-		arguments := strings.TrimSpace(update.Message.CommandArguments())
-		if arguments == "" { 
-			bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "No search term was provided!"))
-			return nil
-		}
-		todos, err := models.SearchTodo(runCtx, arguments)
-		if err != nil {
-			bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "No search term was provided!"))
-			return nil
-		}
-		reply := printTodoList(*todos)	
-		bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, reply))
-
-	default:
-		bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Unknown command!"))
+		msg := tgbotapi.NewMessage(update.Message.Chat.ID, replyStr)
+		msg.ParseMode = tgbotapi.ModeHTML
+		_, err := bot.Send(msg)
+		fmt.Printf("TodoBot err: %v\n", err)
 	}
 
 	return nil
 }
 
+
+func addTodo(runCtx *models.RunCtx, update tgbotapi.Update) string {
+	arguments := update.Message.CommandArguments()
+	todo, err := addTodoFromBotMessage(arguments)
+	if err != nil {	
+		if strings.Contains(err.Error(), "/add") {
+			return err.Error()
+		}
+		return fmt.Sprintf("❌ Error parsing values for Todo: %s", err.Error())
+	}
+
+	if err := models.CreateToDo(runCtx, todo); err != nil {
+		return fmt.Sprintf("❌ Failed to save Todo in database: %s", err.Error())
+	}
+
+	return fmt.Sprintf("✅ Todo added successfully: %s", todo.Title)
+}
+
+
+func deleteTodo(runCtx *models.RunCtx, update tgbotapi.Update) string {
+	arguments := update.Message.CommandArguments()
+	arguments = strings.TrimSpace(arguments)
+
+	id, valueList, err := deleteTodoFromBotMessage(arguments)
+	if err != nil {
+		return fmt.Sprintf("Error deleting Todo: %s", err.Error())
+	}
+
+	if valueList != nil {
+		err = models.UpdateToDo(runCtx, id, valueList)
+		if err != nil {
+			return fmt.Sprintf("Error updating Todo to Deleted: %s", err.Error())
+		}
+		return "Todo successfully updated!"
+
+	} else {
+		err = models.DeleteToDo(runCtx, id)
+		if err != nil {
+			return fmt.Sprintf("Error deleting Todo: %s", err.Error())
+		}
+
+		return "Todo successfully deleted!"
+	}
+}
+
+
 func listTodo(runCtx *models.RunCtx, update tgbotapi.Update) string {
 	arguments := update.Message.CommandArguments()
+	arguments = strings.TrimSpace(arguments)
 
 	switch {
 	case arguments == "filters":
-		return filtersStr
+		return todoFilterStr
 
 	case arguments == "":
 		todoList, err := models.GetAllToDos(runCtx)
@@ -126,62 +118,97 @@ func listTodo(runCtx *models.RunCtx, update tgbotapi.Update) string {
 		return printTodoList(todoList)
 
 	case strings.Contains(arguments, " "):
-		fmt.Printf("Arguments passed to ParseFilter: %s\n", arguments)
 		filter, err := models.ParseFilter(arguments)
-		fmt.Printf("TodoFilter returned by ParseFilter: %+v\n", filter)
 		if err != nil {
-			return fmt.Sprintf("Usage: /listtodo <name> <value>\n"+err.Error())
+			return fmt.Sprintf("Usage: /list [filter_name] [value]\n%v", err.Error())
 		}
-		todos, err := models.GetFilteredTodos(runCtx, filter)
 
+		todos, err := models.GetFilteredTodos(runCtx, filter)
+		if err != nil {
+			return fmt.Sprintf("Error retrieving Todos from database: %v", err.Error())
+		}
+
+		if todos == nil {
+			return fmt.Sprintf("No Todos were found matching the filtering condition: %s", arguments)
+		}
 		return printTodoList(todos)
 
 	case !strings.Contains(arguments, " ") && arguments != "filters":
 		return "Unknown argument!"
 
-
 	default:
-		return "Unknown arguments"
+		return "Unknown argument!"
 	}
 }
 
-func selectTodo(runCtx *models.RunCtx, update tgbotapi.Update) string {
 
+func searchTodo(runCtx *models.RunCtx, update tgbotapi.Update) string {
 	arguments := update.Message.CommandArguments()
-	if arguments == "" {
-		return "No Todo ID was provided."
+	arguments = strings.TrimSpace(arguments)
+	if arguments == "" { 
+		return "No search term was provided - usage: /search [search_term]"
 	}
+	todos, err := models.SearchTodo(runCtx, arguments)
+	if err != nil {
+		return fmt.Sprintf("Error retrieving Todos from database: %s", err.Error())
+	}
+
+	if todos == nil {
+		return fmt.Sprintf("No Todo matched the search term: %s", arguments)
+	}
+
+	return printTodoList(*todos)
+}
+
+
+func selectTodo(runCtx *models.RunCtx, update tgbotapi.Update) string {
+	arguments := update.Message.CommandArguments()
+	arguments = strings.TrimSpace(arguments)
+
+	if arguments == "" {
+		return "No Todo ID was provided - usage: /select [todo_id]"
+	}
+
 	id, err := strconv.ParseInt(arguments, 10, 64)
 	if err != nil {
 		return fmt.Sprintf("Error parsing ID: %v\n", err)
 	}
+
 	todo, err := models.GetToDoByID(runCtx, id)
 	if err != nil {
 		return fmt.Sprintf("Error getting Todo by ID: %v\n", err)
 	}
 
-	replyStr := formatToDo(&todo)
-
-	return replyStr
+	return formatToDo(&todo)
 }
 
-func updateTodoFromMessage(args string) (int64, map[string]string, error) {
-    if strings.TrimSpace(args) == "" {
-        return 0, nil, fmt.Errorf(
-	"Please provide update information for Todo in the following format:\n" +
-			"/updatetodo 3				- number is Todo ID\n" +
-            "title Buy Milk				- mandatory!\n" +
-            "due 2026-10-12\n" +
-            "priority 3					- between 1-5\n" +
-            "assigned John\n" +
-            "category Shopping\n" +
-            "notes 1.5% or 2%\n" +
-            "tags groceries,weekly		- comma-separated list\n" +
-			"reminder 2026-10-11 13:15",
-        )
+
+func updateToDo(runCtx *models.RunCtx, update tgbotapi.Update) string {
+	arguments := update.Message.CommandArguments()
+	arguments = strings.TrimSpace(arguments)
+
+	id, valueList, err := updateTodoFromBotMessage(arguments)
+	if err != nil {
+		if strings.Contains(err.Error(), "/update") {
+			return err.Error()
+		}
+		return fmt.Sprintf("Error parsing values: %s", err.Error())
+	}
+
+	err = models.UpdateToDo(runCtx, id, valueList)
+	if err != nil {
+		return fmt.Sprintf("Error updating Todo: %s", err.Error())
+	}
+
+	return "Todo successfully updated!"
+}
+
+func updateTodoFromBotMessage(args string) (int64, map[string]string, error) {
+    if args == "" {
+        return 0, nil, errors.New(updateTodoStr)
     }
 
-    lines := strings.Split(strings.TrimSpace(args), "\n")
+    lines := strings.Split(args, "\n")
 	
 	valueList := make(map[string]string)
 	var id int64
@@ -193,11 +220,11 @@ func updateTodoFromMessage(args string) (int64, map[string]string, error) {
         }
 
 		if i == 0 {
-			parseId, err := strconv.ParseInt(line, 0, 64)
+			parseID, err := strconv.ParseInt(line, 0, 64)
 			if err != nil {
 				return 0, nil, fmt.Errorf("invalid Todo ID")
 			}
-			id = parseId
+			id = parseID
 			fmt.Printf("ID parsed: %d\n", id)
 			continue
 		}
@@ -218,21 +245,9 @@ func updateTodoFromMessage(args string) (int64, map[string]string, error) {
 
 }
 
-func todoFromBotMessage(args string) (models.Todo, error) {
+func addTodoFromBotMessage(args string) (models.Todo, error) {
     if strings.TrimSpace(args) == "" {
-        return models.Todo{}, fmt.Errorf(
-	"Please provide Todo details in the following format:\n" +
-			"/addtodo\n" +
-            "title Buy Milk				- mandatory!\n" +
-            "due 2026-10-12\n" +
-			"status pending				- pending/in_progress/done/cancelled\n" +
-            "priority 3					- between 1-5\n" +
-            "assigned John\n" +
-            "category Shopping\n" +
-            "notes 1.5% or 2%\n" +
-            "tags groceries,weekly		- comma-separated list\n" +
-			"reminder 2026-10-11 13:15",
-        )
+        return models.Todo{}, errors.New(addTodoStr)
     }
 
     var (
@@ -271,7 +286,7 @@ func todoFromBotMessage(args string) (models.Todo, error) {
         case "priority":
             p, err := strconv.Atoi(value)
             if err != nil {
-                return models.Todo{}, fmt.Errorf("priority must be a number 1-5")
+                return models.Todo{}, fmt.Errorf("priority must be a number between 1 and 5")
             }
             opts = append(opts, models.WithPriority(p))
 
@@ -317,16 +332,20 @@ func todoFromBotMessage(args string) (models.Todo, error) {
     return models.NewTodo(title, opts...)
 }
 
-func deleteTodoFromMessage(args string) (int64, map[string]string, error) {
-	args = strings.TrimSpace(args)
+/*
+deleteTodoFromBotMessage parses the arguments for the /delete command.
+It returns the ID of the Todo and checks if it is a force delete or not.
+If it is not a force delete, it returns a map to be parsed into a TodoFilter.
+*/
+func deleteTodoFromBotMessage(args string) (int64, map[string]string, error) {
     if args == "" {
-        return 0, nil, fmt.Errorf("missing Todo ID")
+		return 0, nil, fmt.Errorf("missing arguments - usage: /delete <ID> [f]/[force]")
     }
 
 	if strings.Contains(args, " ") {
 		parts := strings.SplitN(args, " ", 2)
 		if parts[1] != "f" && parts[1] != "force" {
-			return 0, nil, fmt.Errorf("error with 2nd arguments - command should be /deletetodo <ID> <f>/<force>")
+			return 0, nil, fmt.Errorf("error with arguments - command should be /delete <ID> <f>/<force>")
 		}
 		id, err := strconv.ParseInt(parts[0], 0, 64)
 		if err != nil {
@@ -349,10 +368,9 @@ func deleteTodoFromMessage(args string) (int64, map[string]string, error) {
 // printfTodoList takes an []Todo and returns a string that could be passed
 // vie Telegram to the user.
 func printTodoList(tl []models.Todo) string {
-
 	var sb strings.Builder
 	for i, t := range tl {
-		sb.WriteString(fmt.Sprintf("%d. %s (ID: %d)\n", i + 1, t.Title, t.ID))
+		sb.WriteString(fmt.Sprintf("<i>%d.</i> %s (<b>ID: %d</b>)\n", i + 1, t.Title, t.ID))
 	}
 
 	return sb.String()
@@ -392,52 +410,20 @@ func formatToDo(t *models.Todo) string {
         notesStr = "\n📝 " + t.Notes
     }
 
-    // Escape for Telegram MarkdownV2
-    titleEsc := escapeMarkdownV2(t.Title)
-    assignedEsc := escapeMarkdownV2(assigned)
-    dueEsc := escapeMarkdownV2(dueStr)
-    categoryEsc := escapeMarkdownV2(t.Category)
-
     return fmt.Sprintf(
-        "%s %s\n"+
+        "<b>%s</b> %s\n"+
             "👤 Assigned to: %s\n"+
             "📅 Due: %s\n"+
             "⭐ Priority: %d\n"+
-			"~  Catergory: %s\n"+
+			"⭐	Catergory: %s\n"+
             "%s%s\n",
-        statusEmoji, titleEsc,
-        assignedEsc,
-        dueEsc,
+        t.Title,
+		statusEmoji,
+        assigned,
+        dueStr,
         t.Priority,
-		categoryEsc,
+		t.Category,
         tagsStr,
         notesStr,
     )
-}
-
-func escapeMarkdownV2(text string) string {
-    if text == "" {
-        return ""
-    }
-    replacer := strings.NewReplacer(
-		"_",  `\_`,
-		"*",  `\*`,
-		"[",  `\[`,
-		"]",  `\]`,
-		"(",  `\(`,
-		")",  `\)`,
-		"~",  `\~`,
-		"`",  "\\`",  
-		">",  `\>`,
-		"#",  `\#`,
-		"+",  `\+`,
-		"-",  `\-`,
-		"=",  `\=`,
-		"|",  `\|`,
-		"{",  `\{`,
-		"}",  `\}`,
-		".",  `\.`,
-		"!",  `\!`,
-    )
-    return replacer.Replace(text)
 }
