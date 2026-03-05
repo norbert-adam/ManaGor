@@ -11,12 +11,23 @@ import (
 
 
 var botStr string = `
-	Welcome to the ManaGor Application!
+	<b><u>Welcome to the ManaGor platform!</u></b>
 
-	Available commands:
+	This is an all-in-one life management platform that you can interact with from anytwhere
+	using Telegram.
+	This is the main menu of the platform - you can access the different applications from here.
+
+	The platform serves the following applications:
+		- <b>ToDo:</b> add, list, search, filter, delete Todos. You can get Telegram 
+			notifications via setting the ReminderAt property of the Todo.
+		- <b>Calendar:</b> 
+		- <b>Warranty Tracker:</> save & track your warranties, get notifications when something
+			expires, so that you could get rid of it.
+		- <b>Recipes:</b> create a database of your favourite recipes.
+		
+	To access these applications, use the following commands:
 		/todo
 		/cal
-		
 	`
 
 func StartBot(runCtx *models.RunCtx) error {
@@ -48,7 +59,9 @@ func StartBot(runCtx *models.RunCtx) error {
 
 		switch update.Message.Command() {
 		case "start":
-			bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, botStr))
+			msg := tgbotapi.NewMessage(update.Message.Chat.ID, botStr)
+			msg.ParseMode = tgbotapi.ModeHTML
+			bot.Send(msg)
 
 		case "todo":
 			err := TodoBot(runCtx, bot, updates)
@@ -59,20 +72,11 @@ func StartBot(runCtx *models.RunCtx) error {
 			bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Calendar was called."))
 
 		default:
-			bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, botStr))
+			msg := tgbotapi.NewMessage(update.Message.Chat.ID, botStr)
+			msg.ParseMode = tgbotapi.ModeHTML
+			bot.Send(msg)
 
 		}
-		
-		// switch {
-		// case strings.Contains(update.Message.Command(), "todo"):
-		// 	err := TodoBot(runCtx, bot, update) 
-		// 	if err != nil {
-		// 		return err
-		// 	}
-		// case strings.Contains(update.Message.Command(), "cal"):
-		// 	reply := "Calendar command was called.\n"	
-		// 	bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, reply))
-		// }
 	}
 
 	return nil

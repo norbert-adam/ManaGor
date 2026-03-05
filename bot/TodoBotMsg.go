@@ -19,9 +19,9 @@ Available filters (case insensitive):
 `
 
 var todoBotStr string = `
-	Welcome to the ToDo Application!
+	<b>Welcome to the ToDo Application!</b>
 
-	Available commands:
+	<i>Available commands:</i>
 		/add
 		/delete
 		/list
@@ -29,7 +29,7 @@ var todoBotStr string = `
 		/select
 		/update
 	
-	Return to Main Menu:
+	<i>Return to Main Menu:</i>
 		/exit
 	`
 

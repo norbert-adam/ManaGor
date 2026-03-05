@@ -16,7 +16,10 @@ import (
 // TodoBot function runs the Todo sub-application - returns to the main app on /exit command
 func TodoBot(runCtx *models.RunCtx, bot *tgbotapi.BotAPI, updates tgbotapi.UpdatesChannel) error {
 
-	bot.Send(tgbotapi.NewMessage(runCtx.TgChatID, todoBotStr))
+	welc := tgbotapi.NewMessage(runCtx.TgChatID, todoBotStr)
+	welc.ParseMode = tgbotapi.ModeHTML
+	bot.Send(welc)
+
 	var replyStr string
 
 	for update := range updates {
