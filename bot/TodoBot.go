@@ -127,6 +127,8 @@ func listTodo(runCtx *models.RunCtx, arguments string) string {
 			return fmt.Sprintf("Error listing all Todos: %v\n", err)
 		}
 
+		if len(todoList) <= 5 {
+		}
 		return printTodoList(todoList)
 
 	case strings.Contains(arguments, " "):
@@ -186,7 +188,7 @@ func selectTodo(runCtx *models.RunCtx, arguments string) string {
 		return fmt.Sprintf("Error getting Todo by ID: %v\n", err)
 	}
 
-	return formatToDo(&todo)
+	return formatToDoLong(&todo)
 }
 
 
@@ -207,6 +209,7 @@ func updateToDo(runCtx *models.RunCtx, arguments string) string {
 
 	return "Todo successfully updated!"
 }
+
 
 func updateTodoFromBotMessage(args string) (int64, map[string]string, error) {
     if args == "" {
@@ -249,6 +252,7 @@ func updateTodoFromBotMessage(args string) (int64, map[string]string, error) {
 	return id, valueList, nil
 
 }
+
 
 func addTodoFromBotMessage(args string) (models.Todo, error) {
     if args == "" {
@@ -337,6 +341,7 @@ func addTodoFromBotMessage(args string) (models.Todo, error) {
     return models.NewTodo(title, opts...)
 }
 
+
 /*
 deleteTodoFromBotMessage parses the arguments for the /delete command.
 It returns the ID of the Todo and checks if it is a force delete or not.
@@ -395,12 +400,19 @@ func cmdArgs(update tgbotapi.Update) string {
 	return strings.TrimSpace(arg)
 }
 
+
 // printfTodoList takes an []Todo and returns a string that could be passed
 // vie Telegram to the user.
 func printTodoList(tl []models.Todo) string {
 	var sb strings.Builder
+	n := len(tl)
+
 	for i, t := range tl {
-		sb.WriteString(fmt.Sprintf("<i>%d.</i> %s (<b>ID: %d</b>)\n", i + 1, t.Title, t.ID))
+		if n <= 5 {
+			sb.WriteString(fmt.Sprintf("<i>%d.</i> %s", i + 1, formatTodoMedium(&t)))
+		} else if n > 5 {
+			sb.WriteString(fmt.Sprintf("<i>%d.</i> %s", i + 1, formatTodoShort(&t)))
+		}
 	}
 
 	return sb.String()
@@ -420,9 +432,37 @@ func SendReminder(runCtx *models.RunCtx) {
 }
 
 
-// formatToDo takes a Todo struct and returns a formatted string version
+func formatTodoShort(t *models.Todo) string {
+	return fmt.Sprintf("%s (<b>ID: %d</b>)\n", t.Title, t.ID)
+}
+
+
+func formatTodoMedium(t *models.Todo) string {
+
+    dueStr := "N/A"
+    if t.DueDate != nil {
+        dueStr = t.DueDate.Format(time.ANSIC)
+    }
+
+    assigned := t.AssignedTo
+    if assigned == "" {
+        assigned = "N/A"
+    }
+	
+	return fmt.Sprintf(
+		"<b><u>%s</u></b> - Due: <i>%s</i>\n" +
+		"<b>Status: %s</b> - Assigned: <i>%s</i>\n",
+		t.Title,
+		dueStr,
+		t.Status,
+		assigned,
+	)
+}
+
+
+// formatToDoLong takes a Todo struct and returns a formatted string version
 // that could be sent via Telegram message.
-func formatToDo(t *models.Todo) string {
+func formatToDoLong(t *models.Todo) string {
     statusEmoji := "⏳"
     switch t.Status {
     case "done":
