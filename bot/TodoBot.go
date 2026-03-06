@@ -23,24 +23,38 @@ func TodoBot(runCtx *models.RunCtx, bot *tgbotapi.BotAPI, updates tgbotapi.Updat
 	var replyStr string
 
 	for update := range updates {
+		arg := cmdArgs(update)
+
 		switch update.Message.Command() {
 		case "add":
-			replyStr = addTodo(runCtx, update)
+			replyStr = addTodo(runCtx, arg)
 
 		case "delete":
-			replyStr = deleteTodo(runCtx, update)
+			replyStr = deleteTodo(runCtx, arg)
 
 		case "list":
-			replyStr = listTodo(runCtx, update)
+			replyStr = listTodo(runCtx, arg)
 
 		case "search":
-			replyStr = searchTodo(runCtx, update)
+			replyStr = searchTodo(runCtx, arg)
 
 		case "select":
-			replyStr = selectTodo(runCtx, update)	
+			replyStr = selectTodo(runCtx, arg)	
 
 		case "update":
-			replyStr = updateToDo(runCtx, update)
+			replyStr = updateToDo(runCtx, arg)
+
+		case "today":
+			arg = dueHandlerTodo("today")
+			replyStr = listTodo(runCtx, arg)
+
+		case "overdue":
+			arg = dueHandlerTodo("overdue")
+			replyStr = listTodo(runCtx, arg)
+
+		case "upcoming":
+			arg = dueHandlerTodo("upcoming")
+			replyStr = listTodo(runCtx, arg)
 
 		case "exit":
 			return nil
@@ -59,8 +73,7 @@ func TodoBot(runCtx *models.RunCtx, bot *tgbotapi.BotAPI, updates tgbotapi.Updat
 }
 
 
-func addTodo(runCtx *models.RunCtx, update tgbotapi.Update) string {
-	arguments := update.Message.CommandArguments()
+func addTodo(runCtx *models.RunCtx, arguments string) string {
 	todo, err := addTodoFromBotMessage(arguments)
 	if err != nil {	
 		if strings.Contains(err.Error(), "/add") {
@@ -77,9 +90,7 @@ func addTodo(runCtx *models.RunCtx, update tgbotapi.Update) string {
 }
 
 
-func deleteTodo(runCtx *models.RunCtx, update tgbotapi.Update) string {
-	arguments := update.Message.CommandArguments()
-	arguments = strings.TrimSpace(arguments)
+func deleteTodo(runCtx *models.RunCtx, arguments string) string {
 
 	id, valueList, err := deleteTodoFromBotMessage(arguments)
 	if err != nil {
@@ -104,9 +115,7 @@ func deleteTodo(runCtx *models.RunCtx, update tgbotapi.Update) string {
 }
 
 
-func listTodo(runCtx *models.RunCtx, update tgbotapi.Update) string {
-	arguments := update.Message.CommandArguments()
-	arguments = strings.TrimSpace(arguments)
+func listTodo(runCtx *models.RunCtx, arguments string) string {
 
 	switch {
 	case arguments == "filters":
@@ -145,9 +154,7 @@ func listTodo(runCtx *models.RunCtx, update tgbotapi.Update) string {
 }
 
 
-func searchTodo(runCtx *models.RunCtx, update tgbotapi.Update) string {
-	arguments := update.Message.CommandArguments()
-	arguments = strings.TrimSpace(arguments)
+func searchTodo(runCtx *models.RunCtx, arguments string) string {
 	if arguments == "" { 
 		return "No search term was provided - usage: /search [search_term]"
 	}
@@ -164,10 +171,7 @@ func searchTodo(runCtx *models.RunCtx, update tgbotapi.Update) string {
 }
 
 
-func selectTodo(runCtx *models.RunCtx, update tgbotapi.Update) string {
-	arguments := update.Message.CommandArguments()
-	arguments = strings.TrimSpace(arguments)
-
+func selectTodo(runCtx *models.RunCtx, arguments string) string {
 	if arguments == "" {
 		return "No Todo ID was provided - usage: /select [todo_id]"
 	}
@@ -186,9 +190,7 @@ func selectTodo(runCtx *models.RunCtx, update tgbotapi.Update) string {
 }
 
 
-func updateToDo(runCtx *models.RunCtx, update tgbotapi.Update) string {
-	arguments := update.Message.CommandArguments()
-	arguments = strings.TrimSpace(arguments)
+func updateToDo(runCtx *models.RunCtx, arguments string) string {
 
 	id, valueList, err := updateTodoFromBotMessage(arguments)
 	if err != nil {
@@ -249,7 +251,7 @@ func updateTodoFromBotMessage(args string) (int64, map[string]string, error) {
 }
 
 func addTodoFromBotMessage(args string) (models.Todo, error) {
-    if strings.TrimSpace(args) == "" {
+    if args == "" {
         return models.Todo{}, errors.New(addTodoStr)
     }
 
@@ -258,7 +260,7 @@ func addTodoFromBotMessage(args string) (models.Todo, error) {
         opts  []func(*models.Todo)
     )
 
-    lines := strings.Split(strings.TrimSpace(args), "\n")
+    lines := strings.Split(args, "\n")
 
     for _, line := range lines {
         line = strings.TrimSpace(line)
@@ -269,7 +271,7 @@ func addTodoFromBotMessage(args string) (models.Todo, error) {
         // Split into key and value on the first space only
         parts := strings.SplitN(line, " ", 2)
         if len(parts) != 2 {
-			return models.Todo{}, fmt.Errorf("invalid line %q, expected format: <key> <value>", line)
+			return models.Todo{}, fmt.Errorf("invalid line %q, expected format: [key] [value]", line)
         }
 
         key   := strings.ToLower(strings.TrimSpace(parts[0]))
@@ -342,13 +344,13 @@ If it is not a force delete, it returns a map to be parsed into a TodoFilter.
 */
 func deleteTodoFromBotMessage(args string) (int64, map[string]string, error) {
     if args == "" {
-		return 0, nil, fmt.Errorf("missing arguments - usage: /delete <ID> [f]/[force]")
+		return 0, nil, fmt.Errorf("missing arguments - usage: /delete [ID] [f]/[force]")
     }
 
 	if strings.Contains(args, " ") {
 		parts := strings.SplitN(args, " ", 2)
 		if parts[1] != "f" && parts[1] != "force" {
-			return 0, nil, fmt.Errorf("error with arguments - command should be /delete <ID> <f>/<force>")
+			return 0, nil, fmt.Errorf("error with arguments - command should be /delete [ID] [f]/[force]")
 		}
 		id, err := strconv.ParseInt(parts[0], 0, 64)
 		if err != nil {
@@ -368,6 +370,31 @@ func deleteTodoFromBotMessage(args string) (int64, map[string]string, error) {
 }
 
 
+func dueHandlerTodo(command string) string {
+	tStr := time.Now().String()
+	parts := strings.SplitN(tStr, " ", 2)
+
+	switch command {
+	case "today":
+		return fmt.Sprintf("due %s", parts[0])
+		
+	case "overdue":
+		return fmt.Sprintf("duebefore %s", parts[0])
+
+	case "upcoming":
+		return fmt.Sprintf("dueafter %s", parts[0])
+
+	default:
+		return ""
+	}
+}
+
+
+func cmdArgs(update tgbotapi.Update) string {
+	arg := update.Message.CommandArguments()
+	return strings.TrimSpace(arg)
+}
+
 // printfTodoList takes an []Todo and returns a string that could be passed
 // vie Telegram to the user.
 func printTodoList(tl []models.Todo) string {
@@ -378,6 +405,20 @@ func printTodoList(tl []models.Todo) string {
 
 	return sb.String()
 }
+
+
+func SendReminder(runCtx *models.RunCtx) {
+	for {
+		todos, err := models.GetAllToDos(runCtx)
+		if err != nil {
+			break
+		}
+		for _, t := range todos {
+			fmt.Printf("ToDo: %s - due date: %s\n", t.Title, t.DueDate)
+		}
+	}
+}
+
 
 // formatToDo takes a Todo struct and returns a formatted string version
 // that could be sent via Telegram message.
@@ -392,10 +433,30 @@ func formatToDo(t *models.Todo) string {
         statusEmoji = "❌"
     }
 
+	createStr := "N/A"
+	if !t.CreatedAt.IsZero() {
+		createStr = t.CreatedAt.Format(time.ANSIC)
+	}
+
+	compStr := "N/A"
+	if t.CompletedAt != nil {
+		compStr = t.CompletedAt.Format(time.ANSIC)		
+	}
+
     dueStr := "N/A"
     if t.DueDate != nil {
         dueStr = t.DueDate.Format(time.ANSIC) // e.g. "Mon 02 Mar 18:00"
     }
+
+    updStr := "N/A"
+    if !t.UpdatedAt.IsZero() {
+        updStr = t.UpdatedAt.Format(time.ANSIC)
+    }
+
+	remStr := "N/A"
+	if t.ReminderAt != nil {
+		remStr = t.ReminderAt.Format(time.ANSIC)
+	}
 
     assigned := t.AssignedTo
     if assigned == "" {
@@ -417,6 +478,10 @@ func formatToDo(t *models.Todo) string {
         "<b>%s</b> %s\n"+
             "👤 Assigned to: %s\n"+
             "📅 Due: %s\n"+
+            "📅 Created: %s\n"+
+            "📅 Updated: %s\n"+
+            "📅 Reminder: %s\n"+
+            "📅 Completed: %s\n"+
             "⭐ Priority: %d\n"+
 			"⭐	Catergory: %s\n"+
             "%s%s\n",
@@ -424,6 +489,10 @@ func formatToDo(t *models.Todo) string {
 		statusEmoji,
         assigned,
         dueStr,
+		createStr,
+		updStr,
+		remStr,
+		compStr,
         t.Priority,
 		t.Category,
         tagsStr,
