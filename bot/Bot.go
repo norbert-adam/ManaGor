@@ -2,7 +2,7 @@ package bot
 
 import (
 	"fmt"
-	"time"
+	// "time"
 	// "strings"
 
 	"github.com/ManaGor/models"
@@ -39,12 +39,7 @@ func StartBot(runCtx *models.RunCtx) error {
 	}
 	updates := bot.GetUpdatesChan(tgbotapi.UpdateConfig{Timeout: 60})
 
-	go func() {
-		for i := range 10 {
-			fmt.Printf("This is coming from a Go routine - %d. round.\n", i)
-			time.Sleep(time.Second)
-		}
-	} ()
+	go SendReminder(runCtx, bot)
 
 
 	for update := range updates {

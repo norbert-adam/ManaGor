@@ -3,6 +3,7 @@ package bot
 import (
 	"errors"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -188,7 +189,7 @@ func selectTodo(runCtx *models.RunCtx, arguments string) string {
 		return fmt.Sprintf("Error getting Todo by ID: %v\n", err)
 	}
 
-	return formatToDoLong(&todo)
+	return formatTodoLong(&todo)
 }
 
 
@@ -419,16 +420,32 @@ func printTodoList(tl []models.Todo) string {
 }
 
 
-func SendReminder(runCtx *models.RunCtx) {
+func SendReminder(runCtx *models.RunCtx, bot *tgbotapi.BotAPI) {
 	for {
+		fmt.Println("Inside SendReminder.")
 		todos, err := models.GetAllToDos(runCtx)
 		if err != nil {
 			break
 		}
 		for _, t := range todos {
 			fmt.Printf("ToDo: %s - due date: %s\n", t.Title, t.DueDate)
+			if n := getTimeDiff(t.DueDate); n < 2 {
+				msg := tgbotapi.NewMessage(runCtx.TgChatID, formatTodoMedium(&t))
+				msg.ParseMode = tgbotapi.ModeHTML
+				bot.Send(msg)
+			}
 		}
+		time.Sleep(time.Second * 10)
 	}
+}
+
+
+func getTimeDiff(due *time.Time) float64 {
+	now := time.Now()
+	diff := due.Sub(now)
+	hours := diff.Hours()
+
+	return math.Round(hours)
 }
 
 
@@ -450,8 +467,10 @@ func formatTodoMedium(t *models.Todo) string {
     }
 	
 	return fmt.Sprintf(
-		"<b><u>%s</u></b> - Due: <i>%s</i>\n" +
-		"<b>Status: %s</b> - Assigned: <i>%s</i>\n",
+		"<b><u>%s</u></b>\n" +
+		"	- Due: <i>%s</i>\n" +
+		"	- <b>Status: %s</b>\n" + 
+		"	- Assigned: <i>%s</i>\n",
 		t.Title,
 		dueStr,
 		t.Status,
@@ -460,9 +479,9 @@ func formatTodoMedium(t *models.Todo) string {
 }
 
 
-// formatToDoLong takes a Todo struct and returns a formatted string version
+// formatTodoLong takes a Todo struct and returns a formatted string version
 // that could be sent via Telegram message.
-func formatToDoLong(t *models.Todo) string {
+func formatTodoLong(t *models.Todo) string {
     statusEmoji := "⏳"
     switch t.Status {
     case "done":
