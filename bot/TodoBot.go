@@ -401,7 +401,6 @@ func cmdArgs(update tgbotapi.Update) string {
 	return strings.TrimSpace(arg)
 }
 
-
 // printfTodoList takes an []Todo and returns a string that could be passed
 // vie Telegram to the user.
 func printTodoList(tl []models.Todo) string {
@@ -422,20 +421,20 @@ func printTodoList(tl []models.Todo) string {
 
 func SendReminder(runCtx *models.RunCtx, bot *tgbotapi.BotAPI) {
 	for {
-		fmt.Println("Inside SendReminder.")
-		todos, err := models.GetAllToDos(runCtx)
+		// fmt.Println("Inside SendReminder.")
+		_, err := models.GetAllToDos(runCtx)
 		if err != nil {
 			break
 		}
-		for _, t := range todos {
-			fmt.Printf("ToDo: %s - due date: %s\n", t.Title, t.DueDate)
-			if n := getTimeDiff(t.DueDate); n < 2 {
-				msg := tgbotapi.NewMessage(runCtx.TgChatID, formatTodoMedium(&t))
-				msg.ParseMode = tgbotapi.ModeHTML
-				bot.Send(msg)
-			}
-		}
-		time.Sleep(time.Second * 10)
+		// for _, t := range todos {
+		// 	fmt.Printf("ToDo: %s - due date: %s\n", t.Title, t.DueDate)
+			// if n := getTimeDiff(t.DueDate); n < 2 {
+			// 	msg := tgbotapi.NewMessage(runCtx.TgChatID, formatTodoMedium(&t))
+			// 	msg.ParseMode = tgbotapi.ModeHTML
+			// 	bot.Send(msg)
+			// }
+		// }
+		// time.Sleep(time.Second * 10)
 	}
 }
 
