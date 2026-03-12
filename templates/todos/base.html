@@ -1,0 +1,90 @@
+{{ define "base" }}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Golem • {{ block "title" . }}App{{ end }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap');
+
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+        }
+
+        .logo-font {
+            font-family: 'Space Grotesk', sans-serif;
+        }
+
+        .nav-link {
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .nav-link:hover {
+            color: #22d3ee !important;
+            transform: translateY(-1px);
+        }
+
+        .active {
+            color: #22d3ee;
+            border-bottom: 3px solid #22d3ee;
+        }
+
+        {{ block "styles" . }}{{ end }}
+    </style>
+</head>
+<body class="bg-zinc-950 text-zinc-200 min-h-screen">
+
+    <!-- Navigation Bar -->
+    <nav class="bg-zinc-900 border-b border-zinc-800 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-6 py-5 flex items-center justify-between">
+            <!-- Logo -->
+            <div class="flex items-center gap-x-3">
+                <div class="w-9 h-9 bg-cyan-500 rounded-2xl flex items-center justify-center text-white font-bold text-2xl shadow-lg shadow-cyan-500/50">
+                    G
+                </div>
+                <div>
+                    <span class="logo-font text-3xl font-semibold tracking-tighter text-white">golem</span>
+                </div>
+            </div>
+
+            <!-- Menu Items -->
+            <div class="flex items-center gap-x-8 text-sm font-medium">
+                <a href="/"      class="nav-link {{ if eq .ActivePage "home"     }}active{{ else }}text-zinc-400 hover:text-zinc-200{{ end }} px-4 py-2">Home</a>
+                <a href="/calendar" class="nav-link {{ if eq .ActivePage "calendar" }}active{{ else }}text-zinc-400 hover:text-zinc-200{{ end }} px-4 py-2">Calendar</a>
+                <a href="/todos" class="nav-link {{ if eq .ActivePage "todos"    }}active{{ else }}text-zinc-400 hover:text-zinc-200{{ end }} px-4 py-2">Todos</a>
+                <a href="/warranty" class="nav-link {{ if eq .ActivePage "warranty" }}active{{ else }}text-zinc-400 hover:text-zinc-200{{ end }} px-4 py-2">Warranty</a>
+            </div>
+
+            <!-- Right side -->
+            <div class="flex items-center gap-x-4">
+                <div class="bg-zinc-800 text-xs px-3 py-1.5 rounded-2xl flex items-center gap-x-2 border border-zinc-700">
+                    <div class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+                    <span class="text-emerald-400 font-mono">home-server online</span>
+                </div>
+                <button class="bg-white text-zinc-900 hover:bg-zinc-100 px-5 py-2 rounded-2xl text-sm font-semibold flex items-center gap-x-2 transition">
+                    <i class="fa-brands fa-telegram"></i>
+                    <span>Telegram</span>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Page Content -->
+    <main class="max-w-7xl mx-auto px-6 py-12">
+        {{ block "content" . }}{{ end }}
+    </main>
+
+    <!-- Footer -->
+    <footer class="text-center py-8 text-xs text-zinc-600">
+        Built with ❤️ in Go • Your private life OS
+    </footer>
+
+    {{ block "scripts" . }}{{ end }}
+
+</body>
+</html>
+{{ end }}

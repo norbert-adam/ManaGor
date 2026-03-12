@@ -129,7 +129,9 @@ func WithStatus(s string) func(*Todo) {
 }
 
 func WithReminderAt(r time.Time) func(*Todo) {
-    return func(t *Todo) { t.ReminderAt = &r }
+    return func(t *Todo) {
+		t.ReminderAt = &r
+	}
 }
 
 func (t Todo) GetTags() ([]string, error) {

@@ -55,3 +55,27 @@ func GetToDoByID(runCtx *RunCtx, id int64) (Todo, error) {
 
     return t, nil
 }
+
+
+func (rc *RunCtx) GetAllCategories() []string {
+	rows, err := rc.DB.Query(`
+		SELECT DISTINCT category
+		FROM todos
+		WHERE deleted = 0 AND category != ''
+		ORDER BY category
+		`)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+
+	var categories []string
+
+	for rows.Next() {
+		var c string
+		rows.Scan(&c)
+		categories = append(categories, c)
+	}
+
+	return categories
+}

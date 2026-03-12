@@ -15,6 +15,7 @@ type TodoFilter struct {
     Priority   int
     Tag        string
     Deleted    bool
+	DueDate	   *time.Time
     DueBefore  *time.Time
     DueAfter   *time.Time
 }
@@ -53,6 +54,13 @@ func ParseFilter(input string) (TodoFilter, error) {
 
     case "tag":
         f.Tag = value
+
+	case "due":
+		t, err := time.Parse("2006-01-02", value)
+		if err != nil {
+			return f, fmt.Errorf("due must be in YYYY-MM-DD format")
+		}
+		f.DueDate = &t
 
     case "duebefore":
         t, err := time.Parse("2006-01-02", value)
@@ -118,9 +126,15 @@ func GetFilteredTodos(runCtx *RunCtx, f TodoFilter) ([]Todo, error) {
     }
 
     if f.DueAfter != nil {
-        query += " AND due_date >= ?"
-        args = append(args, f.DueAfter)
+
+        query += " AND due_date BETWEEN ? AND ?"
+        args = append(args, f.DueAfter, f.DueAfter.Add(time.Hour * 24 * 7))
     }
+
+	if f.DueDate != nil {
+		query += " AND due_date = ?"
+		args = append(args, f.DueDate)
+	}
 
     // Tag filtering: since tags are stored as JSON (e.g. ["groceries","weekend"])
     // we use SQLite's LIKE to search for the tag value within the JSON string

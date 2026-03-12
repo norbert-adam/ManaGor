@@ -2,28 +2,19 @@ package main
 
 import (
 	"fmt"
-	// "net/http"
 	"os"
 
 	_ "modernc.org/sqlite"
 
-	"github.com/ManaGor/models"
 	"github.com/ManaGor/bot"
 	"github.com/ManaGor/db"
-
-	// "github.com/gin-gonic/gin"
+	"github.com/ManaGor/handlers"
+	"github.com/ManaGor/models"
 )
 
 func main() {
 
 	fmt.Println("Hell World!")
-
-	// router := gin.Default()
-	// router.LoadHTMLGlob("templates/*")
-	// router.GET("/", func(c *gin.Context) {
-	// 	c.HTML(http.StatusOK, "index.tmpl", "")
-	// })
-	// router.Run(":8080")
 
 	runCtx, err := models.LoadContext()
 	if err != nil {
@@ -37,6 +28,8 @@ func main() {
 		fmt.Printf("%+v", err)
 		os.Exit(1)
 	}
+
+	go handlers.StartHTTP(runCtx)	
 
 	bot.StartBot(runCtx)
 
