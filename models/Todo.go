@@ -20,8 +20,6 @@ type Todo struct {
 	CompletedAt *time.Time `json:"completed_at,omitempty"` // nullable
 	UpdatedAt   time.Time  `json:"updated_at"`
 	ReminderAt  *time.Time `json:"reminder_at,omitempty"`  // nullable
-	RemSet		bool		`json:"reminder_set,omitempty"`
-	RemDone 	bool		`json:"reminder_done,omitempty"`
 	Category    string     `json:"category"`
 	TagsJSON    string     `json:"-"`                      // raw JSON from DB column (do NOT expose directly)
 	Deleted     bool       `json:"deleted"`
@@ -133,7 +131,6 @@ func WithStatus(s string) func(*Todo) {
 func WithReminderAt(r time.Time) func(*Todo) {
     return func(t *Todo) {
 		t.ReminderAt = &r
-		t.RemSet = true
 	}
 }
 
